@@ -1,0 +1,146 @@
+resource "kubernetes_pod_v1" "apple_app" {
+  metadata {
+    name = "apple-app"
+    namespace = "default"
+    labels = {
+      app = "apple"
+    }
+  }
+
+  spec {
+    container {
+      image = "hashicorp/http-echo"
+      name  = "apple-app"
+      args = [
+        "-text=apple",
+        "-status-code=200"
+      ]
+    }
+  }
+}
+
+resource "kubernetes_pod_v1" "banana_app" {
+  metadata {
+    name = "banana-app"
+    namespace = "default"
+    labels = {
+      app = "banana"
+    }
+  }
+
+  spec {
+    container {
+      image = "hashicorp/http-echo"
+      name  = "banana-app"
+      args = [
+        "-text=banana",
+        "-status-code=200"
+      ]
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "apple_service" {
+  metadata {
+    name = "apple-svc"
+    namespace = "default"
+  }
+  spec {
+    selector = {
+      app = kubernetes_pod_v1.apple_app.metadata.0.labels.app
+    }
+    port {
+      port        = 8080
+      target_port = 5678
+    }
+
+    type = "NodePort"
+  }
+}
+
+resource "kubernetes_service_v1" "banana_service" {
+  metadata {
+    name = "banana-svc"
+    namespace = "default"
+  }
+  spec {
+    selector = {
+      app = kubernetes_pod_v1.banana_app.metadata.0.labels.app
+    }
+    port {
+      port        = 8080
+      target_port = 5678
+    }
+
+    type = "NodePort"
+  }
+}
+
+resource "kubernetes_ingress_v1" "ingress_demo" {
+  depends_on = [helm_release.albc_controller]
+  metadata {
+    name = "ingress-demo"
+    namespace = "default"
+    annotations = {
+      "alb.ingress.kubernetes.io/load-balancer-name" = "${var.eks_name}-alb-ingress"
+      "alb.ingress.kubernetes.io/scheme" = "internet-facing"
+      "alb.ingress.kubernetes.io/target-type" = "ip"
+      "alb.ingress.kubernetes.io/inbound-cidrs" = "${chomp(data.http.my_public_ip.response_body)}/32"
+      "alb.ingress.kubernetes.io/listen-ports" = <<JSON
+[
+  {"HTTP": 80}
+]
+JSON
+      "alb.ingress.kubernetes.io/healthcheck-protocol" =  "HTTP"
+      "alb.ingress.kubernetes.io/healthcheck-port" = "traffic-port" 
+      "alb.ingress.kubernetes.io/healthcheck-path" =  "/health"
+      "alb.ingress.kubernetes.io/healthcheck-interval-seconds" = 15
+      "alb.ingress.kubernetes.io/healthcheck-timeout-seconds" = 5
+      "alb.ingress.kubernetes.io/success-codes" = 200
+      "alb.ingress.kubernetes.io/healthy-threshold-count" = 2
+      "alb.ingress.kubernetes.io/unhealthy-threshold-count" = 2
+    }  
+  }
+
+  spec {
+    ingress_class_name = "alb" # kubernetes_ingress_class_v1.ingress_class_alb.metadata.0.name
+    default_backend {
+      service {
+        name = kubernetes_service_v1.apple_service.metadata.0.name
+        port {
+          number = 8080
+        }
+      }
+    }
+
+    rule {
+      http {
+        path {
+          backend {
+            service {
+              name = kubernetes_service_v1.apple_service.metadata.0.name
+              port {
+                number = 8080
+              }
+            }
+          }
+
+          path = "/apple/*"
+        }
+
+        path {
+          backend {
+            service {
+              name = kubernetes_service_v1.banana_service.metadata.0.name
+              port {
+                number = 8080
+              }
+            }
+          }
+
+          path = "/banana/*"
+        }
+      }
+    }
+  }
+}
