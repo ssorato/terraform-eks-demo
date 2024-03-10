@@ -1,6 +1,6 @@
 output "private_subnet_internet_gw_ip" {
   description = "Private subnet internet gw ip"
-  value = var.eks_private_nodes ? aws_eip.eks_natgw_eip[0].public_ip : null
+  value = var.eks_nodes.private_ec2 != null ? aws_eip.eks_natgw_eip[0].public_ip : null
 }
 
 output "kubeconfig" {
@@ -48,7 +48,7 @@ output "eksadmin1-acess-key-secret" {
 }
 
 output "bastion_public_ip" {
-  value     = var.eks_private_nodes ? aws_instance.bastion[0].public_ip : null
+  value     = var.eks_nodes.private_ec2 != null ? aws_instance.bastion[0].public_ip : null
 }
 
 output "eks_api_endpoint" {

@@ -12,13 +12,17 @@ resource "aws_security_group" "eks_control_plane_sg" {
 }
 
 resource "aws_security_group_rule" "eks_control_plane_sg_ingress_rule" {
+  for_each = {
+    for node, conf in var.eks_nodes :
+      node => conf if conf != null && node != "fargate"
+  }
   security_group_id = aws_security_group.eks_control_plane_sg.id
   protocol          = "tcp"
   from_port         = 443
   to_port           = 443
-  source_security_group_id = aws_security_group.nodes_sg.id
+  source_security_group_id = aws_security_group.nodes_sg[each.key].id
   type              = "ingress"
-  description       = "Communication to the EKS control plane from EKS nodes"
+  description       = "Communication to the EKS control plane from EKS ${ replace(each.key,"_","-") } nodes"
 }
 
 resource "aws_security_group_rule" "eks_control_plane_sg_egress_rule" {
@@ -38,11 +42,11 @@ resource "aws_eks_cluster" "eks_cluster" {
   version  = var.k8s_version
 
   vpc_config {
-    subnet_ids              = var.eks_private_nodes ? aws_subnet.eks_private_subnet[*].id : aws_subnet.eks_public_subnet[*].id
+    subnet_ids              = var.eks_nodes.private_ec2 != null ? aws_subnet.eks_private_subnet[*].id : aws_subnet.eks_public_subnet[*].id
     endpoint_public_access  = true
     endpoint_private_access = true
     security_group_ids      = [aws_security_group.eks_control_plane_sg.id]
-    public_access_cidrs     = var.eks_private_nodes ? [
+    public_access_cidrs     = var.eks_nodes.private_ec2 != null ? [
       "${chomp(data.http.my_public_ip.response_body)}/32",
       "${aws_eip.eks_natgw_eip[0].public_ip}/32"
     ] : [

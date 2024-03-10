@@ -1,5 +1,5 @@
 resource "aws_security_group" "bastion_sg" {
-  count = var.eks_private_nodes ? 1 : 0
+  count = var.eks_nodes.private_ec2 != null ? 1 : 0
 
   name          = "bastion-sg-${var.eks_name}"
   vpc_id        = aws_vpc.eks_vpc.id
@@ -30,7 +30,7 @@ resource "aws_security_group" "bastion_sg" {
 }
 
 resource "aws_security_group_rule" "bastion_sg_ingress_self" {
-  count = var.eks_private_nodes ? 1 : 0
+  count = var.eks_nodes.private_ec2 != null ? 1 : 0
   description              = "Bastion self ingress rule"
   from_port                = 0
   protocol                 = "-1"
@@ -41,7 +41,7 @@ resource "aws_security_group_rule" "bastion_sg_ingress_self" {
 }
 
 resource "aws_instance" "bastion" {
-  count = var.eks_private_nodes ? 1 : 0
+  count = var.eks_nodes.private_ec2 != null ? 1 : 0
 
   ami                         = "ami-0e9107ed11be76fde"
   instance_type               = "t2.micro"

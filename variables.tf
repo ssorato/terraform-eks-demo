@@ -45,19 +45,41 @@ variable "eks_service_ipv4_cidr" {
   }
 }
 
-variable "eks_nodes_ec2" {
+variable "eks_nodes" {
   type = object({
-    instance_types  = list(string),
-    scaling_min     = number
-    scaling_max     = number
-    scaling_size    = number
+    public_ec2  = object({
+      instance_types  = list(string),
+      scaling_min     = number
+      scaling_max     = number
+      scaling_size    = number
+    }),
+    private_ec2 = object({
+      instance_types  = list(string),
+      scaling_min     = number
+      scaling_max     = number
+      scaling_size    = number
+    }),
+    fargate     = list(object({
+        profile_name = string
+        namespace = string
+        labels = map(string)
+      }))
   })
-  description = "The EKS EC2 node group size"
   default     = {
-    instance_types  = ["t3a.medium"],
-    scaling_min     = 1
-    scaling_max     = 3
-    scaling_size    = 2
+    public_ec2  = {
+      instance_types  = ["t3a.medium"],
+      scaling_min     = 1
+      scaling_max     = 3
+      scaling_size    = 2
+    },
+    private_ec2  = null
+    fargate     = null
+  }
+  validation {
+    condition     = var.eks_nodes.fargate != null ? alltrue([
+      for p in var.eks_nodes.fargate : !contains(["kube-system"], p.namespace)
+    ]) : true
+    error_message = "The Fargate profile cannot be created in the kube-system namespace. Still needs to be review ..."
   }
 }
 

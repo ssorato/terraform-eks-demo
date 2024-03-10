@@ -30,8 +30,7 @@ resource "aws_subnet" "eks_public_subnet" {
 }
 
 resource "aws_subnet" "eks_private_subnet" {
-  count = length(var.private_subnet_cidr)
-
+  count = var.eks_nodes.private_ec2 != null || var.eks_nodes.fargate != null ? length(var.private_subnet_cidr) : 0
   vpc_id                  = aws_vpc.eks_vpc.id
   cidr_block              = var.private_subnet_cidr[count.index]
   availability_zone       = data.aws_availability_zones.region_azones.names[count.index]
@@ -82,7 +81,7 @@ resource "aws_route_table_association" "eks_public_subnet_route" {
 }
 
 resource "aws_eip" "eks_natgw_eip" {
-  count = var.eks_private_nodes ? 1 : 0
+  count = var.eks_nodes.private_ec2 != null || var.eks_nodes.fargate != null ? 1 : 0
   domain = "vpc"
 
   tags = merge(
@@ -99,7 +98,7 @@ resource "aws_eip" "eks_natgw_eip" {
 # Saving money using one nat gateway
 #
 resource "aws_nat_gateway" "eks_natgw" {
-  count = var.eks_private_nodes ? 1 : 0
+  count = var.eks_nodes.private_ec2 != null || var.eks_nodes.fargate != null ? 1 : 0
 
   allocation_id = aws_eip.eks_natgw_eip[0].id
   subnet_id     = aws_subnet.eks_public_subnet[count.index].id
@@ -117,7 +116,7 @@ resource "aws_nat_gateway" "eks_natgw" {
 }
 
 resource "aws_route_table" "eks_private_route" {
-  count = var.eks_private_nodes ? 1 : 0
+  count = var.eks_nodes.private_ec2 != null || var.eks_nodes.fargate != null ? 1 : 0
 
   vpc_id = aws_vpc.eks_vpc.id
 
@@ -135,7 +134,7 @@ resource "aws_route_table" "eks_private_route" {
 }
 
 resource "aws_route_table_association" "eks_private_subnet_route" {
-  count = var.eks_private_nodes ? length(var.private_subnet_cidr) : 0
+  count = var.eks_nodes.private_ec2 != null || var.eks_nodes.fargate != null ? length(var.private_subnet_cidr) : 0
 
   route_table_id = aws_route_table.eks_private_route[0].id
   subnet_id      = aws_subnet.eks_private_subnet[count.index].id
