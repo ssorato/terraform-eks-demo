@@ -21,7 +21,7 @@ resource "aws_security_group_rule" "nodes_sg_eks_ingress_rule" {
       node => conf if conf != null && node != "fargate"
   }
   security_group_id        = aws_security_group.nodes_sg[each.key].id
-  source_security_group_id = aws_security_group.eks_control_plane_sg.id
+  cidr_blocks              = [aws_vpc.eks_vpc.cidr_block]
   protocol                 = "-1"
   from_port                = 0
   to_port                  = 65535
@@ -43,29 +43,12 @@ resource "aws_security_group_rule" "nodes_sg_egress_rule" {
   description       = "EKS ${ replace(each.key,"_","-") } nodes egress rule - All traffic"
 }
 
-resource "aws_security_group" "nodes_remote_access_sg" {
+resource "aws_security_group_rule" "nodes_sg_remote_access_ingress_rule" {
   for_each = {
     for node, conf in var.eks_nodes :
       node => conf if conf != null && node != "fargate"
   }
-  name = "node-${ replace(each.key,"_","-") }-remote-access-sg-${var.eks_name}" 
-  vpc_id = aws_vpc.eks_vpc.id
-  description = "EKS ${ replace(each.key,"_","-") } nodes remote access security group"
-
-  tags = merge(
-    {
-      Name = "node-${ replace(each.key,"_","-") }-remote-access-sg-${var.eks_name}"
-    },
-    var.common_tags
-  )
-}
-
-resource "aws_security_group_rule" "nodes_remote_access_sg_ingress_rule" {
-  for_each = {
-    for node, conf in var.eks_nodes :
-      node => conf if conf != null && node != "fargate"
-  }
-  security_group_id = aws_security_group.nodes_remote_access_sg[each.key].id
+  security_group_id = aws_security_group.nodes_sg[each.key].id
   protocol          = "-1"
   from_port         = 0
   to_port           = 0
@@ -73,20 +56,6 @@ resource "aws_security_group_rule" "nodes_remote_access_sg_ingress_rule" {
   source_security_group_id = each.key == "private_ec2" ? aws_security_group.bastion_sg[0].id : null
   type              = "ingress"
   description       = "EKS ${ replace(each.key,"_","-") } nodes ingress rule - Remote access"
-}
-
-resource "aws_security_group_rule" "nodes_remote_access_sg_egress_rule" {
-  for_each = {
-    for node, conf in var.eks_nodes :
-      node => conf if conf != null && node != "fargate"
-  }
-  security_group_id = aws_security_group.nodes_remote_access_sg[each.key].id
-  protocol          = "-1"
-  from_port         = 0
-  to_port           = 0
-  cidr_blocks       = ["0.0.0.0/0"]
-  type              = "egress"
-  description       = "EKS ${ replace(each.key,"_","-") } nodes egress rule - Remote access"
 }
 
 resource "aws_eks_node_group" "eks_node_group" {
@@ -105,13 +74,6 @@ resource "aws_eks_node_group" "eks_node_group" {
   capacity_type = "ON_DEMAND"
   disk_size = 20
   instance_types = each.value.instance_types
-
-  remote_access {
-    ec2_ssh_key               = aws_key_pair.eks_ssh_key.key_name
-    source_security_group_ids = [
-      aws_security_group.nodes_remote_access_sg[each.key].id
-    ]
-  }
 
   scaling_config {
     desired_size = each.value.scaling_size

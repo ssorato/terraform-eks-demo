@@ -20,7 +20,7 @@ resource "aws_security_group_rule" "eks_control_plane_sg_ingress_rule" {
   protocol          = "tcp"
   from_port         = 443
   to_port           = 443
-  source_security_group_id = aws_security_group.nodes_sg[each.key].id
+  cidr_blocks       = [aws_vpc.eks_vpc.cidr_block]
   type              = "ingress"
   description       = "Communication to the EKS control plane from EKS ${ replace(each.key,"_","-") } nodes"
 }
@@ -45,7 +45,10 @@ resource "aws_eks_cluster" "eks_cluster" {
     subnet_ids              = var.eks_nodes.private_ec2 != null ? aws_subnet.eks_private_subnet[*].id : aws_subnet.eks_public_subnet[*].id
     endpoint_public_access  = true
     endpoint_private_access = true
-    security_group_ids      = [aws_security_group.eks_control_plane_sg.id]
+    security_group_ids      = concat(
+      [aws_security_group.eks_control_plane_sg.id],
+      values(aws_security_group.nodes_sg)[*].id
+    )
     public_access_cidrs     = var.eks_nodes.private_ec2 != null ? [
       "${chomp(data.http.my_public_ip.response_body)}/32",
       "${aws_eip.eks_natgw_eip[0].public_ip}/32"
