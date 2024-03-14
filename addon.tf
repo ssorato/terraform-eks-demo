@@ -1,4 +1,4 @@
-resource "aws_eks_addon" "csi_driver" {
+resource "aws_eks_addon" "ebs_csi_driver" {
   cluster_name                = aws_eks_cluster.eks_cluster.name
   addon_name                  = "aws-ebs-csi-driver"
   service_account_role_arn    = aws_iam_role.ebs_csi_iam_role.arn
@@ -67,6 +67,26 @@ resource "aws_eks_addon" "vpc_cni" {
   )
 
   depends_on = [ 
+    aws_eks_node_group.eks_node_group,
+    aws_eks_fargate_profile.fargate_profile
+  ]
+}
+
+resource "aws_eks_addon" "efs_csi_driver" {
+  cluster_name                = aws_eks_cluster.eks_cluster.name
+  addon_name                  = "aws-efs-csi-driver"
+  service_account_role_arn    = aws_iam_role.efs_csi_iam_role.arn
+  resolve_conflicts_on_create = "OVERWRITE"
+ 
+  tags = merge(
+    {
+      Name = "addon-aws-efs-csi-driver"
+    },
+    var.common_tags
+  )
+
+  depends_on = [
+    aws_iam_role_policy_attachment.efs_csi_iam_role_policy_attach,
     aws_eks_node_group.eks_node_group,
     aws_eks_fargate_profile.fargate_profile
   ]
