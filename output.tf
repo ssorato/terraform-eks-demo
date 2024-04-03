@@ -54,3 +54,23 @@ output "bastion_public_ip" {
 output "eks_api_endpoint" {
   value = aws_eks_cluster.eks_cluster.endpoint
 }
+
+output "nodes_sg" {
+  value = values(aws_security_group.nodes_sg)[*].id
+  description = "SG used in node group"
+}
+
+# output "nodes_sg_remote_access" {
+#   value = values(aws_security_group.nodes_remote_access_sg)[*].id
+#   description = "SG used in remote access node group"
+# }
+
+output "eks_control_plane_sg" {
+  value = aws_security_group.eks_control_plane_sg.id
+  description = "SG eks_control_plane_sg"
+}
+
+output "eks_cluster_sg" {
+  value = aws_eks_cluster.eks_cluster.vpc_config[0].cluster_security_group_id
+  description = "EKS SG id"
+}
